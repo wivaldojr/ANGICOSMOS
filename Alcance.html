@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alcance · Competição de foguetes</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF2F0; --panel:#FFFFFF; --ink:#14232B; --muted:#5D6E76; --line:#D3DCD8;
+    --accent:#E8590C; --ok:#1F9D55; --bad:#D64545;
+    --head-font:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+    --body-font:"Barlow","Segoe UI",Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0F1A20; --panel:#172830; --ink:#E9F0EE; --muted:#93A5AD; --line:#2A404A; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body-font);font-size:18px}
+  main{max-width:560px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
+  h1{font-family:var(--head-font);font-size:34px;margin:4px 0 0;line-height:1}
+  button,select{font-family:var(--body-font);font-size:18px;border-radius:10px}
+  button:focus-visible,select:focus-visible,.seg input:focus-visible + span{outline:3px solid var(--accent);outline-offset:2px}
+  .big{width:100%;padding:16px;border:0;font-weight:700;letter-spacing:.02em;cursor:pointer;color:#fff;background:var(--accent)}
+  .big.base{background:var(--ink);color:var(--bg)}
+  .big.fin{background:var(--ok)}
+  .big:disabled{opacity:.5}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .muted{color:var(--muted);font-size:15px}
+  select,input.txt{width:100%;padding:14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font-size:18px}
+  .lab{font-weight:700;margin-bottom:10px;font-family:var(--head-font);font-size:24px}
+  .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg label{display:block;cursor:pointer}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg span{display:block;padding:12px 22px;font-weight:700;background:var(--bg);color:var(--muted)}
+  .seg input:checked + span.sim{background:var(--ok);color:#fff}
+  .seg input:checked + span.nao{background:var(--bad);color:#fff}
+  .res{font-family:var(--head-font);font-size:32px;font-weight:700;font-variant-numeric:tabular-nums}
+  .res small{font-family:var(--body-font);font-size:14px;font-weight:400;color:var(--muted);display:block}
+  #map{height:340px;border-radius:12px;border:1px solid var(--line)}
+  .msg{min-height:1.3em}
+  .msg.err{color:var(--bad)}
+  #codigo{width:100%;min-height:74px;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);word-break:break-all}
+  .small{padding:10px 14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;cursor:pointer}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Medir alcance</h1>
+
+  <button id="base" class="big base">DEFINIR LOCAL DE BASE</button>
+  <div class="msg muted" id="baseMsg">Base ainda não definida.</div>
+
+  <div class="card">
+    <div id="selWrap"></div>
+  </div>
+
+  <div class="card" id="b1">
+    <div class="lab">VALIDAR ALCANCE 1:</div>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="Validar alcance 1">
+        <label><input type="radio" name="v1" value="sim"><span class="sim">SIM</span></label>
+        <label><input type="radio" name="v1" value="nao"><span class="nao">NÃO</span></label>
+      </div>
+      <div class="res" id="r1">—</div>
+    </div>
+    <div class="msg muted" id="m1"></div>
+  </div>
+
+  <div class="card" id="b2">
+    <div class="lab">VALIDAR ALCANCE 2:</div>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="Validar alcance 2">
+        <label><input type="radio" name="v2" value="sim"><span class="sim">SIM</span></label>
+        <label><input type="radio" name="v2" value="nao"><span class="nao">NÃO</span></label>
+      </div>
+      <div class="res" id="r2">—</div>
+    </div>
+    <div class="msg muted" id="m2"></div>
+  </div>
+
+  <div id="map" aria-label="Mapa com a base e os pontos de queda"></div>
+
+  <button id="fin" class="big fin">FINALIZAR</button>
+  <div class="msg" id="finMsg"></div>
+
+  <div class="card" id="codeBox" hidden>
+    <div class="muted" style="margin-bottom:8px">Se o controle estiver em outro aparelho, copie este código e use "Importar resultado" no controle.html.</div>
+    <textarea id="codigo" readonly></textarea>
+    <div style="margin-top:8px"><button class="small" id="copiar">Copiar código</button></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  var KEY = 'foguetes_v1', BASEKEY = 'alcance_base_v1';
+  var channel = ('BroadcastChannel' in window) ? new BroadcastChannel('foguetes') : null;
+
+  var base = null;                 // {lat, lon, acc}
+  var L_ = [null, null];           // pontos de queda
+  var escolha = [null, null];      // 'sim' | 'nao'
+  var A = [null, null];            // alcances (m)
+
+  try{ base = JSON.parse(localStorage.getItem(BASEKEY)); }catch(e){}
+
+  function $(id){ return document.getElementById(id); }
+  function fmt(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  /* ---------- Geodésia: Vincenty inverso (WGS-84), com haversine de reserva ---------- */
+  var rad = Math.PI/180;
+  function haversine(la1,lo1,la2,lo2){
+    var R=6371008.8, dLa=(la2-la1)*rad, dLo=(lo2-lo1)*rad;
+    var h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*rad)*Math.cos(la2*rad)*Math.sin(dLo/2)*Math.sin(dLo/2);
+    return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+  }
+  function vincenty(la1,lo1,la2,lo2){
+    var a=6378137, f=1/298.257223563, b=(1-f)*a;
+    var U1=Math.atan((1-f)*Math.tan(la1*rad)), U2=Math.atan((1-f)*Math.tan(la2*rad));
+    var Lg=(lo2-lo1)*rad, lam=Lg, lamP, it=0;
+    var sU1=Math.sin(U1), cU1=Math.cos(U1), sU2=Math.sin(U2), cU2=Math.cos(U2);
+    var sinSig,cosSig,sig,sinAl,cos2Al,cos2SigM,C;
+    do{
+      var sL=Math.sin(lam), cL=Math.cos(lam);
+      sinSig=Math.sqrt((cU2*sL)*(cU2*sL)+(cU1*sU2-sU1*cU2*cL)*(cU1*sU2-sU1*cU2*cL));
+      if(sinSig===0) return 0;
+      cosSig=sU1*sU2+cU1*cU2*cL;
+      sig=Math.atan2(sinSig,cosSig);
+      sinAl=cU1*cU2*sL/sinSig;
+      cos2Al=1-sinAl*sinAl;
+      cos2SigM=cos2Al!==0 ? cosSig-2*sU1*sU2/cos2Al : 0;
+      C=f/16*cos2Al*(4+f*(4-3*cos2Al));
+      lamP=lam;
+      lam=Lg+(1-C)*f*sinAl*(sig+C*sinSig*(cos2SigM+C*cosSig*(-1+2*cos2SigM*cos2SigM)));
+    }while(Math.abs(lam-lamP)>1e-12 && ++it<200);
+    if(it>=200) return haversine(la1,lo1,la2,lo2);
+    var u2=cos2Al*(a*a-b*b)/(b*b);
+    var A_=1+u2/16384*(4096+u2*(-768+u2*(320-175*u2)));
+    var B_=u2/1024*(256+u2*(-128+u2*(74-47*u2)));
+    var dSig=B_*sinSig*(cos2SigM+B_/4*(cosSig*(-1+2*cos2SigM*cos2SigM)-B_/6*cos2SigM*(-3+4*sinSig*sinSig)*(-3+4*cos2SigM*cos2SigM)));
+    return b*A_*(sig-dSig);
+  }
+
+  /* ---------- GPS: junta amostras por alguns segundos e usa a de melhor precisão ---------- */
+  function getPosition(onProgress){
+    return new Promise(function(resolve,reject){
+      if(!navigator.geolocation){ reject(new Error('Este navegador não tem GPS.')); return; }
+      var best=null, id=null, done=false;
+      function finish(){
+        if(done) return; done=true;
+        if(id!==null) navigator.geolocation.clearWatch(id);
+        clearTimeout(t1); clearTimeout(t2);
+        best ? resolve(best) : reject(new Error('Não foi possível obter o GPS.'));
+      }
+      var t1=setTimeout(finish, 7000);                        // tempo de coleta
+      var t2=setTimeout(function(){ if(!best){ done=true; navigator.geolocation.clearWatch(id); reject(new Error('Tempo esgotado. Verifique se a localização está ligada e permitida.')); } }, 20000);
+      id=navigator.geolocation.watchPosition(function(p){
+        var c=p.coords;
+        if(!best || c.accuracy<best.acc) best={lat:c.latitude,lon:c.longitude,acc:c.accuracy};
+        if(onProgress) onProgress(best);
+        if(best.acc<=3) finish();
+      }, function(err){
+        if(done) return; done=true; clearTimeout(t1); clearTimeout(t2);
+        navigator.geolocation.clearWatch(id);
+        reject(new Error(err.code===1 ? 'Permissão de localização negada.' : 'Erro ao obter o GPS.'));
+      }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+    });
+  }
+
+  /* ---------- Base ---------- */
+  function showBase(){
+    $('baseMsg').className='msg muted';
+    $('baseMsg').textContent = base
+      ? 'BASE: '+base.lat.toFixed(6)+', '+base.lon.toFixed(6)+' (±'+Math.round(base.acc)+' m)'
+      : 'Base ainda não definida.';
+  }
+  $('base').addEventListener('click', function(){
+    var b=$('base'); b.disabled=true;
+    $('baseMsg').className='msg muted'; $('baseMsg').textContent='Obtendo GPS…';
+    getPosition(function(p){ $('baseMsg').textContent='Obtendo GPS… precisão ±'+Math.round(p.acc)+' m'; })
+      .then(function(p){
+        base=p; localStorage.setItem(BASEKEY, JSON.stringify(p));
+        showBase();
+        [0,1].forEach(recalc); drawMap();
+      })
+      .catch(function(e){ $('baseMsg').className='msg err'; $('baseMsg').textContent=e.message; })
+      .then(function(){ b.disabled=false; });
+  });
+
+  /* ---------- Equipes (vindas do controle.html) ---------- */
+  function loadTeams(){
+    try{ var s=JSON.parse(localStorage.getItem(KEY)); if(s && Array.isArray(s.equipes)) return s.equipes.map(function(t){return t.nome;}).filter(Boolean); }catch(e){}
+    return [];
+  }
+  function buildSelect(){
+    var wrap=$('selWrap'), atual=(wrap.querySelector('select,input')||{}).value||'';
+    var nomes=loadTeams();
+    if(nomes.length){
+      wrap.innerHTML='<label class="muted" for="equipe">Equipe</label><select id="equipe"><option value="">Selecione a equipe…</option>'+
+        nomes.map(function(n){return '<option>'+n.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</option>';}).join('')+'</select>';
+    }else{
+      wrap.innerHTML='<label class="muted" for="equipe">Equipe (lista do controle não encontrada neste aparelho; digite o nome)</label><input class="txt" id="equipe" placeholder="Nome da equipe">';
+    }
+    if(atual) $('equipe').value=atual;
+  }
+  buildSelect();
+  window.addEventListener('storage', function(e){ if(e.key===KEY) buildSelect(); });
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) buildSelect(); });
+
+  /* ---------- Lançamentos ---------- */
+  function recalc(i){
+    if(L_[i] && base){
+      A[i]=vincenty(base.lat,base.lon,L_[i].lat,L_[i].lon);
+      $('r'+(i+1)).innerHTML='A'+(i+1)+': '+fmt(A[i])+' m<small>GPS ±'+Math.round(L_[i].acc)+' m</small>';
+    }
+  }
+  function onChoice(i, v){
+    var m=$('m'+(i+1)), r=$('r'+(i+1));
+    escolha[i]=v; m.className='msg muted';
+    if(v==='nao'){
+      L_[i]=null; A[i]=0; r.innerHTML='A'+(i+1)+': 0,00 m'; m.textContent=''; drawMap(); return;
+    }
+    if(!base){
+      m.className='msg err'; m.textContent='Defina o local de base primeiro.';
+      escolha[i]=null; A[i]=null; L_[i]=null; r.textContent='—';
+      document.querySelectorAll('input[name=v'+(i+1)+']').forEach(function(x){x.checked=false;});
+      return;
+    }
+    r.textContent='…'; m.textContent='Obtendo GPS… fique no ponto de queda.';
+    getPosition(function(p){ m.textContent='Obtendo GPS… precisão ±'+Math.round(p.acc)+' m'; })
+      .then(function(p){ L_[i]=p; recalc(i); m.textContent='Local L'+(i+1)+': '+p.lat.toFixed(6)+', '+p.lon.toFixed(6); drawMap(); })
+      .catch(function(e){ r.textContent='—'; A[i]=null; m.className='msg err'; m.textContent=e.message+' Marque SIM novamente para tentar de novo.';
+        escolha[i]=null; document.querySelectorAll('input[name=v'+(i+1)+']').forEach(function(x){x.checked=false;}); });
+  }
+  [1,2].forEach(function(n){
+    document.querySelectorAll('input[name=v'+n+']').forEach(function(inp){
+      inp.addEventListener('change', function(){ onChoice(n-1, inp.value); });
+    });
+  });
+
+  /* ---------- Mapa ---------- */
+  var map=null, layer=null;
+  if(window.L){
+    map=L.map('map',{zoomControl:true}).setView([-5.66,-36.6],15);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+    layer=L.layerGroup().addTo(map);
+  }else{
+    $('map').innerHTML='<div class="muted" style="padding:16px">Mapa indisponível (sem internet). Os cálculos continuam funcionando.</div>';
+  }
+  function pt(p,cor,rot){
+    return L.circleMarker([p.lat,p.lon],{radius:9,color:'#fff',weight:2,fillColor:cor,fillOpacity:1})
+      .bindTooltip(rot,{permanent:true,direction:'top',offset:[0,-8]});
+  }
+  function drawMap(){
+    if(!map) return;
+    layer.clearLayers();
+    var pts=[];
+    if(base){ pt(base,'#14232B','BASE').addTo(layer); pts.push([base.lat,base.lon]); }
+    [0,1].forEach(function(i){
+      if(base && L_[i] && escolha[i]==='sim'){
+        L.polyline([[base.lat,base.lon],[L_[i].lat,L_[i].lon]],{color:'#D64545',weight:4,dashArray:i?'8 6':null}).addTo(layer);
+        pt(L_[i],i?'#E8590C':'#D64545','L'+(i+1)).addTo(layer);
+        pts.push([L_[i].lat,L_[i].lon]);
+      }
+    });
+    if(pts.length===1) map.setView(pts[0],18);
+    else if(pts.length>1) map.fitBounds(pts,{padding:[40,40],maxZoom:19});
+  }
+  setTimeout(function(){ if(map){ map.invalidateSize(); drawMap(); } },300);
+  showBase();
+
+  /* ---------- Finalizar ---------- */
+  function toCode(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
+  $('fin').addEventListener('click', function(){
+    var msg=$('finMsg'); msg.className='msg';
+    var nome=($('equipe').value||'').trim();
+    if(!nome){ msg.className='msg err'; msg.textContent='Escolha a equipe antes de finalizar.'; return; }
+    if(escolha[0]===null && escolha[1]===null){ msg.className='msg err'; msg.textContent='Valide ao menos um dos alcances.'; return; }
+    if((escolha[0]==='sim' && A[0]===null) || (escolha[1]==='sim' && A[1]===null)){ msg.className='msg err'; msg.textContent='Aguarde o GPS terminar.'; return; }
+    var pendente = escolha[0]===null || escolha[1]===null;
+    if(pendente && !confirm('Um dos alcances não foi validado e ficará em branco. Continuar?')) return;
+
+    var a1 = A[0]===null ? null : Math.round(A[0]*100)/100;
+    var a2 = A[1]===null ? null : Math.round(A[1]*100)/100;
+
+    var s; try{ s=JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+    if(!s || !Array.isArray(s.equipes)) s={publicado:false,equipes:[]};
+    var t=s.equipes.filter(function(x){ return (x.nome||'').trim().toLowerCase()===nome.toLowerCase(); })[0];
+    if(!t){ t={nome:nome,a1:null,a2:null,dt:null}; s.equipes.push(t); }
+    if(a1!==null) t.a1=a1;
+    if(a2!==null) t.a2=a2;
+    var v=[t.a1,t.a2].map(function(x){return (x===null||x===''||x===undefined)?null:parseFloat(x);}).filter(function(x){return x!==null;});
+    var AM=v.length?Math.max.apply(null,v):null, dt=parseFloat(t.dt), pn=(!isNaN(dt)&&dt>0)?2*(dt/60):0;
+    t.am=AM; t.pn=pn; t.amv=AM===null?null:(AM>0?Math.max(0,AM-pn):0);
+    s.atualizadoEm=Date.now();
+    try{ localStorage.setItem(KEY, JSON.stringify(s)); if(channel) channel.postMessage('update'); }catch(e){}
+
+    $('codigo').value=toCode({nome:nome,a1:a1,a2:a2});
+    $('codeBox').hidden=false;
+    msg.textContent='Resultado salvo: '+nome+' — A1 '+(a1===null?'—':fmt(a1))+' m, A2 '+(a2===null?'—':fmt(a2))+' m.';
+  });
+  $('copiar').addEventListener('click', function(){
+    var ta=$('codigo'); ta.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.resolve(document.execCommand('copy')))
+      .then(function(){ $('copiar').textContent='Copiado'; setTimeout(function(){ $('copiar').textContent='Copiar código'; },1500); });
+  });
+})();
+</script>
+</body>
+</html>
