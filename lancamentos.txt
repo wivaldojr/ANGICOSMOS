@@ -7,3 +7,4 @@ As divas;47.29;1.00
 Clube das winx;0.01;58.21
 As quartos estrelas;0.01;0.01
 Zero Gravidade;158.41;0.00
+As Snoopyzinhas;0.00;
