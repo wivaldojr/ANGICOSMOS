@@ -5,4 +5,4 @@ Maressa Helem, Ana Clara e Kiara Cristina;45.90;1.00
 Força e vitória;0.01;0.01
 As divas;47.29;1.00
 Clube das winx;0.01;58.21
-As quartos estrelas;;0.01
+As quartos estrelas;0.01;0.01
