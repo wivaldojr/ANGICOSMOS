@@ -9,4 +9,4 @@ As quartos estrelas;0.01;0.01
 Zero Gravidade;158.41;0.00
 As Snoopyzinhas;0.00;23.94
 TROVÃO;0.00;55.31
-As fogueteiras;61.98;
+As fogueteiras;61.98;0.00
